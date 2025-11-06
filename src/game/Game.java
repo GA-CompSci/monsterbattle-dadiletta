@@ -23,6 +23,8 @@ public class Game {
     
     // Game state - YOU manage these
     private ArrayList<Monster> monsters;
+    private Monster lastAttacked; // store the monster we last attacked so it can respond
+    private double shieldPower = 0;
     private ArrayList<Item> inventory;
     private int playerHealth;
     private int playerSpeed;
@@ -99,7 +101,8 @@ public class Game {
     private void gameLoop() {
         // Keep playing while monsters alive and player alive
         while (countLivingMonsters() > 0 && playerHealth > 0) {
-            
+            shieldPower = 0; // start of turn, lower shield 
+    
             // PLAYER'S TURN
             gui.displayMessage("Your turn! HP: " + playerHealth);
             int action = gui.waitForAction();  // Wait for button click (0-3)
@@ -186,24 +189,32 @@ public class Game {
             // Fighter: high damage, low healing and shield
             gui.displayMessage("You chose Fighter! High damage, but weak defense.");
             playerShield -= (int)(Math.random() * 20 + 1) + 5;  // Reduce shield by 5-25
-            playerHeal -= (int)(Math.random() * 20 + 1) + 5;        // Reduce heal by 5-25
+            playerHeal -= (int)(Math.random() * 20 + 1) + 5;        // Reduce heal by 5-
+            
+            playerSpeed = (int)(Math.random() * 6) + 5;        // Calc speed by 5-10
         } else if (choice == 1) {
             // Tank: high shield, low damage and speed
             gui.displayMessage("You chose Tank! Tough defense, but slow attacks.");
-            playerSpeed -= (int)(Math.random() * 9) + 1;        // Reduce speed by 1-9
             playerDamage -= (int)(Math.random() * 20 + 1) + 5;   // Reduce damage by 5-25
+
+            playerSpeed = (int)(Math.random() * 9) + 1;        // Calc speed by 1-9
         } else if (choice == 2) {
             // Healer: high healing, low damage and shield
             gui.displayMessage("You chose Healer! Great recovery, but fragile.");
             playerDamage -= (int)(Math.random() * 21) + 5;      // Reduce damage by 5-25
             playerShield -= (int)(Math.random() * 21) + 5;      // Reduce shield by 5-25
+
+            playerSpeed = (int)(Math.random() * 10) + 1;        // Calc speed by 1-10
         } else {
             // Ninja: high speed, low healing and health
             gui.displayMessage("You chose Ninja! Fast and deadly, but risky.");
             playerHeal -= (int)(Math.random() * 21) + 5;        // Reduce heal by 5-25
             playerHealth -= (int)(Math.random() * 21) + 5;         // Reduce max health by 5-25
-        }
 
+            playerSpeed = (int)(Math.random() * 6) + 6;        // Calc speed by 6-11
+        }
+        if(playerHeal < 0) playerHeal = 0; // don't let heal go negative
+        
         gui.setPlayerMaxHealth(playerHealth);
         gui.updatePlayerHealth(playerHealth);
         
@@ -243,6 +254,7 @@ public class Game {
     private void attackMonster() {
         // TODO: Target more intelligently
         Monster target = getRandomLivingMonster();
+        lastAttacked = target;
         int damage = (int)(Math.random() * playerDamage + 1); // 0 - playerDamage
         if(damage == 0) {
             // hurt yourself
@@ -274,22 +286,19 @@ public class Game {
      * - Something else?
      */
     private void defend() {
-        // TODO: Implement your defend!
+        shieldPower = playerShield; // charge up my shield
         
-        gui.displayMessage("TODO: Implement defend!");
+        gui.displayMessage("Shield up! Brace for impact!");
     }
     
     /**
      * Heal yourself
-     * 
-     * TODO: How does healing work?
-     * - How much HP?
-     * - Any limits?
      */
     private void heal() {
-        // TODO: Implement your heal!
+        playerHealth += playerHeal;
+        gui.updatePlayerHealth(playerHealth);
         
-        gui.displayMessage("TODO: Implement heal!");
+        gui.displayMessage("You healed for " + playerHeal + " HP");
     }
     
     /**
@@ -309,17 +318,38 @@ public class Game {
     
     /**
      * Monster attacks player
-     * 
-     * TODO: Customize how monsters attack!
+
      * - How much damage?
      * - Which monster attacks?
      * - Special abilities?
      */
     private void monsterAttack() {
-        // TODO: Implement monster attacks!
-        // Hint: Look at GameDemo.java for an example
-        
-        gui.displayMessage("TODO: Implement monster attack!");
+        // build a list of every monster that gets to take a swipe at us
+        ArrayList<Monster> attackers = getSpeedyMonsters();
+        // first check if there is a lastAttacked
+        if(lastAttacked != null && lastAttacked.health() > 0 && !attackers.contains(lastAttacked)) 
+            attackers.add(lastAttacked);
+
+        for (Monster monster : attackers) {
+            // shoudn't the monster's damage dealt logic be handle in the Monster class? 
+            int damageTaken = (int)(Math.random() * monster.damage() + 1);
+            if (shieldPower > 0) {
+                double absorbance = Math.min(damageTaken, shieldPower);
+                damageTaken -= absorbance;
+                shieldPower -= absorbance;
+                gui.displayMessage("You block for " + absorbance + " damage. You have " + shieldPower + " shield left.");
+            }
+            if (damageTaken > 0) {
+                playerHealth -= damageTaken;
+                gui.displayMessage("Monster hits you for " + damageTaken + " damage!");
+                gui.updatePlayerHealth(playerHealth);
+            }
+            int index = monsters.indexOf(monster);
+            gui.highlightMonster(index);
+            gui.pause(300);
+            gui.highlightMonster(-1);
+        }
+
     }
     
     // ==================== HELPER METHODS ====================
